@@ -1,0 +1,189 @@
+--ROMAN KATEGORİSİNDEKİ KİTAPLAR
+--select*from Kategori k join Kitap ki on ki.KategoriId=k.KategoriId where KategoriAd='Roman'
+
+
+--KÜTÜPHANEDEKİ TOPLAM KİTAP SAYISI
+--select COUNT(k.KitapId) ToplamKitap from Kitap k
+
+
+--PSİKOLOJİ KİTABI OLAN KÜTÜPHANELERİ GETİR
+--select*from Kutuphane k 
+--join Kitap ki on ki.KutuphaneId=k.KutuphaneId 
+--join Kategori ka on ka.KategoriId=ki.KategoriId
+--where KategoriAd='Psikoloji'
+
+
+--MÜŞTERİLERDE OLAN KİTAPLARI VE O KİTAPLARIN ADINI GETİR
+--select ki.KitapAd,(m.MusteriAd+m.MusteriSoyad) as AlanKişiler,km.Durum  from Kitap_Musteri km 
+--join Kitap ki on km.KitapId=ki.KitapId 
+--join Musteri m on km.MusteriId=m.MusteriId
+--where durum='Ödünç Alındı'
+
+--MÜŞTERİDE OLAN VE TÜRÜ ROMAN OLAN KİTAPLARI GETİREN PROC
+--alter proc AlinmisKitaplar
+--(
+--@Kitap1 nvarchar(25)
+--)
+--as
+--select* from Kitap_Musteri km 
+--join Kitap ki on km.KitapId=ki.KitapId 
+--join Kategori ka on ka.KategoriId=ki.KategoriId
+--join Musteri m on km.MusteriId=m.MusteriId
+--where durum='Ödünç Alındı' and ka.KategoriAd=@Kitap1
+
+--exec AlinmisKitaplar @Kitap1='Roman'
+
+
+
+--1 DEN FAZLA KİTAP ALAN MÜŞTERİLER // 
+--select m.MusteriAd,m.MusteriSoyad,m.MusteriId,count(m.MusteriId) AldigiKitapAdet from Kitap_Musteri km 
+--join Musteri m on m.MusteriId=km.MusteriId where durum='Ödünç Alındı'  
+--group by m.MusteriAd,m.MusteriSoyad,m.MusteriId
+--having count(m.MusteriId)>1
+
+
+--KİTAP EKLEME PROCEDURE
+--create proc KitapEkle
+--(
+--@KitapAd nvarchar(35),
+--@KitapYazar nvarchar(35),
+--@Kategori int,
+--@KutuphaneId int
+--)
+--as
+--insert Kitap(KitapAd,KitapYazar,KategoriId,KutuphaneId) values (@KitapAd,@KitapYazar,@Kategori,@KutuphaneId)
+
+--exec KitapEkle 'Kişisel Gelişim Kitabı 2', 'Yazar 5', 5, 1
+
+
+--MÜŞTERİYE KİTAP KİRALAMA
+--create proc KitapKirala
+--(
+--@KitapId int,
+--@MusteriId int,
+--@AlisTarih date,
+--@IadeTarihi date
+--)
+--as
+--insert Kitap_Musteri(KitapId,MusteriId,AlisTarihi,IadeTarihi) values (@KitapId,@MusteriId,@AlisTarih,@IadeTarihi)
+
+--exec KitapKirala 1, 3, '2025-02-10', '2025-07-17'
+
+--MUSTERİ EKLE EĞER VAR UYARI GÖSTER
+--create proc MusteriEkle
+--(
+--@MusteriAd nvarchar(40),
+--@MusteriSoyad nvarchar(40)
+--)
+--as
+--if(not exists(select*from Musteri where MusteriAd=@MusteriAd))
+--begin
+--insert Musteri(MusteriAd,MusteriSoyad) values(@MusteriAd,@MusteriSoyad)
+--end
+--else
+--begin
+--print 'Bu İsimde Müşteri Var'
+--end
+
+--exec MusteriEkle 'Mısra','Kılıçcı'
+--select*from Musteri
+
+
+--MÜŞTERİ SİLME
+--alter procedure MusteriSil
+--(
+--    @MusteriId INT
+--)
+--as
+--begin
+--delete from Kitap_Musteri where MusteriId = @MusteriId;
+--delete from Musteri where MusteriId=@MusteriId
+--IF not exists (select * from Musteri where MusteriId = @MusteriId)
+--begin
+--print 'Kayıtlarda Bu Id ile Uyuşan Müşteri yok '
+--end
+--else
+--begin
+--print 'Müşteri Silindi'
+--end
+--end
+
+--EXEC MusteriSil 11;
+
+--select*from Musteri
+
+
+
+--EN FAZLA KİTAP ÖDÜNÇ ALAN MÜŞTERİ
+--select m.MusteriAd, m.MusteriSoyad, count(km.KitapId) AS KitapSayisi
+--from Kitap_Musteri km
+--join Musteri m on m.MusteriId = km.MusteriId
+--join Kitap k on km.KitapId = k.KitapId
+--where km.Durum = 'Ödünç Alındı' 
+--group by m.MusteriAd, m.MusteriSoyad 
+--order by KitapSayisi desc 
+
+
+--BİRİSİ KİTAP ÖDÜNÇ ALDIĞI ZAMAN DURUM U ÖDÜNÇ ALDI OLARAK YAPAN TRİGGER
+--alter trigger KitapOduncAlTrigger
+--on Kitap_Musteri
+--after insert
+--as
+--begin
+--    declare @KitapId int;
+--    select @KitapId = KitapId from inserted;
+
+--    update Kitap_Musteri
+--    set Durum = 'Ödünç Alındı'
+--    where KitapId = @KitapId;
+    
+--    declare @KitapAd nvarchar(50);
+--    select @KitapAd = KitapAd from Kitap where KitapId = @KitapId;
+    
+--    print 'Kitap Ödünç Alındı: ' + @KitapAd;
+--end
+
+--MÜŞTERİ SİLDİĞİM ZAMAN KAYITLARININ HER ŞEYİNİ SİLEN TRİGGER
+--alter trigger MusteriSilTrigger
+--on Musteri
+--after delete
+--as
+--begin
+--    declare @MusteriId int;
+--    select @MusteriId = MusteriId from deleted;
+
+--    delete from Kitap_Musteri
+--    where MusteriId = @MusteriId;
+    
+--    print 'Müşteri ve ilgili ödünç kitaplar silindi. ' + cast(@MusteriId as nvarchar);
+--end
+
+--PSİKOLOJİ KİTAPLARININ HANGİ KÜTÜPHANEDE OLDUKLARINI GETİREN VİEW
+--create view PsikolojiKitap
+--as
+--select ki.KitapAd,ki.KitapYazar,ka.KategoriAd,k.KutuphaneAd from Kitap ki
+--join Kategori ka on ki.KategoriId=ka.KategoriId
+--join Kutuphane k on k.KutuphaneId=ki.KutuphaneId
+--where ka.KategoriAd='Psikoloji'
+
+--select * from PsikolojiKitap
+
+--HANGİ KÜTÜPHANDE HANGİ KİTAP VAR ONLARI GETİREN VİEW
+--create view KitapNerde
+--as
+--select k.KitapAd, k.KitapYazar, ka.KategoriAd, ku.KutuphaneAd from Kitap k
+--join Kutuphane ku on ku.KutuphaneId=k.KutuphaneId
+--join Kategori ka on ka.KategoriId=k.KategoriId
+
+--select*from KitapNerde
+
+--HANGİ KÜTÜPHANDE KAÇ TANE KİTAP VAR
+--create view KutuphaneKacKitap
+--as
+--select k.KutuphaneAd,count(ki.KitapId) ToplamKitap from Kutuphane k
+--join Kitap ki on ki.KutuphaneId=k.KutuphaneId group by k.KutuphaneAd
+	
+--select*from KutuphaneKacKitap
+
+--
+
